@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="page-title">Loading...</title>
+<meta name="description" id="page-desc" content="">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ── RESET ── */
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+
+/* ── TOKENS — driven by CLIENT CONFIG below ── */
+:root{
+  --brand:#d44f1e;
+  --brand-dark:#b03e18;
+  --ink:#0f0f0f;
+  --ink2:#2e2e2e;
+  --ink3:#6b6b6b;
+  --paper:#faf9f6;
+  --surface:#f2ede8;
+  --border:#e0d9d0;
+  --white:#ffffff;
+  --green:#1a7a4a;
+  --ff-head:'Barlow Condensed',sans-serif;
+  --ff-body:'Barlow',sans-serif;
+  --radius:10px;
+  --shadow:0 2px 20px rgba(0,0,0,.08);
+}
+
+body{
+  font-family:var(--ff-body);
+  background:var(--paper);
+  color:var(--ink);
+  min-height:100vh;
+}
+
+/* ── TRUST BAR ── */
+.trust-bar{
+  background:var(--ink);
+  color:rgba(255,255,255,.75);
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.3px;
+  text-align:center;
+  padding:8px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:20px;
+  flex-wrap:wrap;
+}
+.trust-bar span{display:flex;align-items:center;gap:5px}
+.trust-dot{width:6px;height:6px;border-radius:50%;background:#4cdb8a;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── HERO ── */
+.hero{
+  background:var(--brand);
+  color:var(--white);
+  padding:48px 20px 40px;
+  position:relative;
+  overflow:hidden;
+}
+.hero::before{
+  content:'';
+  position:absolute;
+  top:-60px;right:-60px;
+  width:280px;height:280px;
+  border-radius:50%;
+  background:rgba(255,255,255,.06);
+}
+.hero::after{
+  content:'';
+  position:absolute;
+  bottom:-40px;left:-20px;
+  width:180px;height:180px;
+  border-radius:50%;
+  background:rgba(0,0,0,.08);
+}
+.hero-inner{max-width:600px;margin:0 auto;position:relative;z-index:1}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:7px;
+  background:rgba(255,255,255,.15);
+  border:1px solid rgba(255,255,255,.25);
+  border-radius:20px;
+  padding:5px 13px;
+  font-size:12px;font-weight:500;
+  margin-bottom:18px;
+  letter-spacing:.2px;
+}
+.hero-h1{
+  font-family:var(--ff-head);
+  font-weight:800;
+  font-size:clamp(34px,8vw,54px);
+  line-height:1.05;
+  letter-spacing:-.5px;
+  margin-bottom:14px;
+}
+.hero-h1 em{
+  font-style:normal;
+  color:#f5e642;
+}
+.hero-sub{
+  font-size:16px;
+  font-weight:300;
+  line-height:1.65;
+  opacity:.88;
+  margin-bottom:24px;
+  max-width:460px;
+}
+.hero-trust{
+  display:flex;flex-wrap:wrap;gap:14px;
+}
+.hero-trust-item{
+  display:flex;align-items:center;gap:6px;
+  font-size:13px;font-weight:500;opacity:.9;
+}
+
+/* ── MAIN LAYOUT ── */
+.main{max-width:620px;margin:0 auto;padding:24px 16px 48px}
+
+/* ── FORM CARD ── */
+.form-card{
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:26px;
+  box-shadow:var(--shadow);
+  margin-bottom:20px;
+  animation:slideUp .4s ease both;
+}
+@keyframes slideUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+.form-card-title{
+  font-family:var(--ff-head);
+  font-weight:700;
+  font-size:20px;
+  margin-bottom:4px;
+  letter-spacing:-.2px;
+}
+.form-card-sub{
+  font-size:13px;color:var(--ink3);margin-bottom:20px;
+}
+
+.field{margin-bottom:14px}
+.field label{
+  display:block;font-size:11px;font-weight:500;
+  text-transform:uppercase;letter-spacing:.5px;
+  color:var(--ink3);margin-bottom:5px;
+}
+.field input,.field select{
+  width:100%;padding:11px 13px;
+  border:1.5px solid var(--border);
+  border-radius:var(--radius);
+  font-family:var(--ff-body);
+  font-size:14px;color:var(--ink);
+  background:var(--paper);
+  transition:border .2s,background .2s;
+  -webkit-appearance:none;
+}
+.field input:focus,.field select:focus{
+  outline:none;
+  border-color:var(--brand);
+  background:var(--white);
+}
+.field input::placeholder{color:var(--ink3)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ── CTA BUTTON ── */
+.cta-btn{
+  width:100%;padding:15px;
+  background:var(--brand);
+  color:var(--white);
+  border:none;border-radius:var(--radius);
+  font-family:var(--ff-head);
+  font-weight:700;font-size:17px;
+  letter-spacing:.3px;cursor:pointer;
+  transition:all .2s;
+  margin-top:4px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  position:relative;overflow:hidden;
+}
+.cta-btn:hover{background:var(--brand-dark);transform:translateY(-1px);box-shadow:0 6px 20px rgba(212,79,30,.3)}
+.cta-btn:active{transform:translateY(0)}
+.cta-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.cta-spinner{
+  width:16px;height:16px;
+  border:2.5px solid rgba(255,255,255,.3);
+  border-top-color:#fff;
+  border-radius:50%;
+  animation:spin .7s linear infinite;
+  display:none;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.form-fine{
+  font-size:10px;color:var(--ink3);
+  text-align:center;margin-top:10px;line-height:1.6;
+}
+
+/* ── SUCCESS STATE ── */
+.success-card{
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:36px 26px;
+  text-align:center;
+  box-shadow:var(--shadow);
+  margin-bottom:20px;
+  display:none;
+  animation:slideUp .4s ease both;
+}
+.success-icon{font-size:48px;margin-bottom:16px}
+.success-title{
+  font-family:var(--ff-head);
+  font-weight:800;font-size:26px;
+  margin-bottom:8px;color:var(--green);
+}
+.success-body{font-size:14px;color:var(--ink2);line-height:1.6;max-width:340px;margin:0 auto}
+
+/* ── STATS STRIP ── */
+.stats-strip{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:10px;margin-bottom:20px;
+  animation:slideUp .5s .1s ease both;
+}
+.stat-card{
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:14px 10px;text-align:center;
+}
+.stat-val{
+  font-family:var(--ff-head);
+  font-weight:700;font-size:22px;
+  color:var(--brand);
+  line-height:1;
+}
+.stat-label{font-size:11px;color:var(--ink3);margin-top:4px;line-height:1.4}
+
+/* ── REVIEWS ── */
+.reviews-section{animation:slideUp .5s .2s ease both}
+.reviews-title{
+  font-family:var(--ff-head);
+  font-weight:700;font-size:16px;
+  margin-bottom:12px;letter-spacing:-.1px;
+}
+.review-card{
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:16px;margin-bottom:10px;
+}
+.review-stars{color:#f5a623;font-size:14px;margin-bottom:6px;letter-spacing:1px}
+.review-text{font-size:13px;color:var(--ink2);line-height:1.65;margin-bottom:8px}
+.review-author{font-size:11px;font-weight:500;color:var(--ink3)}
+
+/* ── HOW IT WORKS ── */
+.how-section{
+  margin:24px 0;
+  animation:slideUp .5s .3s ease both;
+}
+.how-title{
+  font-family:var(--ff-head);font-weight:700;font-size:16px;
+  margin-bottom:14px;
+}
+.how-steps{display:flex;flex-direction:column;gap:10px}
+.how-step{
+  display:flex;align-items:flex-start;gap:12px;
+  background:var(--white);border:1px solid var(--border);
+  border-radius:var(--radius);padding:13px 14px;
+}
+.how-num{
+  width:26px;height:26px;border-radius:50%;
+  background:var(--brand);color:var(--white);
+  font-family:var(--ff-head);font-weight:700;font-size:13px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:1px;
+}
+.how-text{font-size:13px;color:var(--ink2);line-height:1.55}
+.how-text strong{color:var(--ink);font-weight:500}
+
+/* ── FOOTER ── */
+.footer{
+  text-align:center;
+  padding:20px 16px;
+  font-size:11px;color:var(--ink3);
+  border-top:1px solid var(--border);
+  line-height:1.7;
+}
+
+/* ── MOBILE ADJUSTMENTS ── */
+@media(max-width:480px){
+  .row2{grid-template-columns:1fr}
+  .hero{padding:36px 16px 32px}
+  .form-card{padding:20px 18px}
+  .trust-bar{gap:12px;font-size:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════════
+     CLIENT CONFIG — THIS IS THE ONLY SECTION YOU CHANGE
+     To set up a new client, update every value below.
+     Everything on the page updates automatically.
+     Takes about 10 minutes to fill in.
+════════════════════════════════════════════════════════════ -->
+<script>
+const CLIENT = {
+  // ── Business info ──────────────────────────────────────────
+  businessName:  "Apex HVAC Charlotte",
+  ownerName:     "Marcus Reid",
+  niche:         "HVAC",
+  area:          "Charlotte, Pineville & Fort Mill",
+  phone:         "(704) 555-0190",
+
+  // ── Page content ───────────────────────────────────────────
+  // The big headline. Put your strongest hook here.
+  // Use [em] tags around the word you want highlighted in yellow.
+  headline:      "Get Your AC Fixed <em>Today</em> — Charlotte's Most Trusted HVAC Team",
+
+  // One sentence under the headline. Keep it simple.
+  subheadline:   "Local, licensed, and fully insured. Free estimates on all repairs and replacements. We serve Charlotte, Pineville, Fort Mill, and surrounding areas.",
+
+  // The services that appear in the dropdown on the form.
+  // List only the top 4-6. Shorter list = less friction = more leads.
+  services: [
+    "AC not cooling",
+    "AC not turning on",
+    "New system installation",
+    "Heating issue",
+    "Emergency — no AC or heat",
+    "Annual tune-up / maintenance",
+  ],
+
+  // Three quick trust signals shown in the hero
+  trustBadges: [
+    "5-star Google rated",
+    "Licensed & insured",
+    "Same-day available",
+  ],
+
+  // Stats shown below the form. Use real numbers if you have them.
+  stats: [
+    { val: "847+",  label: "Happy customers" },
+    { val: "4.9★",  label: "Google rating"   },
+    { val: "Same day", label: "Often available" },
+  ],
+
+  // 2 Google reviews. Ask the client for their best ones.
+  // Or copy them from their Google Business profile.
+  reviews: [
+    {
+      text:   "Called at 9am, they were at my house by noon. AC is running perfect. Super professional and the price was exactly what they quoted.",
+      author: "Marcus T., Pineville NC",
+    },
+    {
+      text:   "Got a text back within minutes of filling out the form. They showed up on time and fixed everything in one visit. Would recommend to anyone.",
+      author: "Jennifer R., Fort Mill SC",
+    },
+  ],
+
+  // ── Backend connection ─────────────────────────────────────
+  // YOUR RAILWAY BACKEND URL + the client's ID in server.js
+  // Example: https://apexleads.up.railway.app/lead/apex-hvac
+  // IMPORTANT: The ID after /lead/ must match the key in CLIENTS
+  // in your server.js file exactly.
+  backendUrl:    "https://YOUR-RAILWAY-URL.up.railway.app/lead/apex-hvac",
+
+  // ── Brand color ────────────────────────────────────────────
+  // Hex color for buttons, accents, hero background.
+  // Use a color that matches the contractor's brand if they have one.
+  // Default orange (#d44f1e) works great for most contractors.
+  brandColor:    "#d44f1e",
+};
+</script>
+<!-- ════════════════════════════════════════════════════════════
+     END CLIENT CONFIG — do not edit anything below this line
+     unless you know what you're doing
+════════════════════════════════════════════════════════════ -->
+
+<!-- TRUST BAR -->
+<div class="trust-bar">
+  <span><span class="trust-dot"></span> Accepting new clients this week</span>
+  <span id="tb-badge1"></span>
+  <span id="tb-badge2"></span>
+  <span id="tb-badge3"></span>
+</div>
+
+<!-- HERO -->
+<div class="hero" id="hero-section">
+  <div class="hero-inner">
+    <div class="hero-eyebrow">✦ <span id="hero-area"></span></div>
+    <h1 class="hero-h1" id="hero-h1"></h1>
+    <p class="hero-sub" id="hero-sub"></p>
+    <div class="hero-trust" id="hero-trust"></div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+  <!-- FORM CARD -->
+  <div class="form-card" id="form-card">
+    <div class="form-card-title">Book your free estimate</div>
+    <div class="form-card-sub">Takes 60 seconds · We'll text you right back</div>
+
+    <div class="row2">
+      <div class="field">
+        <label>First name</label>
+        <input type="text" id="f-first" placeholder="John" autocomplete="given-name">
+      </div>
+      <div class="field">
+        <label>Last name</label>
+        <input type="text" id="f-last" placeholder="Smith" autocomplete="family-name">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Cell phone — we'll text you back</label>
+      <input type="tel" id="f-phone" placeholder="(704) 555-0100" autocomplete="tel">
+    </div>
+
+    <div class="field">
+      <label>Your city or neighborhood</label>
+      <input type="text" id="f-city" placeholder="Pineville, Ballantyne, Fort Mill...">
+    </div>
+
+    <div class="field">
+      <label>What do you need?</label>
+      <select id="f-service"></select>
+    </div>
+
+    <div class="field">
+      <label>Any extra details? <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional but helps)</span></label>
+      <input type="text" id="f-notes" placeholder="e.g. been out 3 days, elderly person at home...">
+    </div>
+
+    <button class="cta-btn" id="submit-btn" onclick="submitForm()">
+      <span class="cta-spinner" id="cta-spinner"></span>
+      <span id="btn-text">Get my free estimate →</span>
+    </button>
+    <div class="form-fine">
+      By submitting you agree to receive texts from <span id="fine-biz"></span>.
+      Standard message rates apply. We never sell your information.
+    </div>
+
+    <div id="error-msg" style="display:none;margin-top:10px;padding:10px 12px;background:#fce4e4;border-radius:8px;font-size:12px;color:#a32020"></div>
+  </div>
+
+  <!-- SUCCESS STATE (shown after submit) -->
+  <div class="success-card" id="success-card">
+    <div class="success-icon">📱</div>
+    <div class="success-title">You're all set!</div>
+    <div class="success-body">
+      We just sent you a text. Reply back and we'll get you on the calendar — usually takes less than 5 minutes.
+      <br><br>
+      <strong>Check your phone now.</strong>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-strip" id="stats-strip"></div>
+
+  <!-- HOW IT WORKS -->
+  <div class="how-section">
+    <div class="how-title">How it works</div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-num">1</div>
+        <div class="how-text"><strong>Fill out the form above.</strong> Takes 60 seconds. No account needed, no spam.</div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">2</div>
+        <div class="how-text"><strong>We text you right back</strong> — usually within 60 seconds — to confirm your request and find a time that works.</div>
+      </div>
+      <div class="how-step">
+        <div class="how-num">3</div>
+        <div class="how-text"><strong>We show up and get it done.</strong> Free estimate, no surprises, licensed and insured every time.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REVIEWS -->
+  <div class="reviews-section">
+    <div class="reviews-title">What our customers say</div>
+    <div id="reviews-list"></div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div id="footer-biz"></div>
+  Serving <span id="footer-area"></span> · Licensed &amp; Insured
+  <br>
+  <a href="tel:" id="footer-phone" style="color:inherit">Call us: <span id="footer-phone-text"></span></a>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────
+   PAGE BUILDER — reads from CLIENT config above and populates
+   every element on the page. Do not edit this section.
+───────────────────────────────────────────────────────────── */
+(function(){
+  // Apply brand color
+  document.documentElement.style.setProperty('--brand', CLIENT.brandColor);
+  // Darken brand color for hover
+  document.documentElement.style.setProperty('--brand-dark', shadeColor(CLIENT.brandColor, -15));
+
+  // Page title and meta
+  document.getElementById('page-title').textContent =
+    `${CLIENT.businessName} — Free Estimate in ${CLIENT.area}`;
+  document.getElementById('page-desc').setAttribute('content',
+    `${CLIENT.subheadline}`);
+
+  // Trust bar
+  CLIENT.trustBadges.forEach((b, i) => {
+    const el = document.getElementById(`tb-badge${i+1}`);
+    if (el) el.textContent = `✓ ${b}`;
+  });
+
+  // Hero
+  document.getElementById('hero-area').textContent = CLIENT.area;
+  document.getElementById('hero-h1').innerHTML = CLIENT.headline;
+  document.getElementById('hero-sub').textContent = CLIENT.subheadline;
+  document.getElementById('hero-trust').innerHTML = CLIENT.trustBadges
+    .map(b => `<div class="hero-trust-item">✓ ${b}</div>`).join('');
+
+  // Services dropdown
+  document.getElementById('f-service').innerHTML =
+    CLIENT.services.map(s => `<option value="${s}">${s}</option>`).join('');
+
+  // Stats strip
+  document.getElementById('stats-strip').innerHTML =
+    CLIENT.stats.map(s =>
+      `<div class="stat-card">
+        <div class="stat-val">${s.val}</div>
+        <div class="stat-label">${s.label}</div>
+      </div>`
+    ).join('');
+
+  // Reviews
+  document.getElementById('reviews-list').innerHTML =
+    CLIENT.reviews.map(r =>
+      `<div class="review-card">
+        <div class="review-stars">★★★★★</div>
+        <div class="review-text">"${r.text}"</div>
+        <div class="review-author">— ${r.author}</div>
+      </div>`
+    ).join('');
+
+  // Footer
+  document.getElementById('footer-biz').textContent = CLIENT.businessName;
+  document.getElementById('footer-area').textContent = CLIENT.area;
+  document.getElementById('footer-phone').href = `tel:${CLIENT.phone.replace(/\D/g,'')}`;
+  document.getElementById('footer-phone-text').textContent = CLIENT.phone;
+  document.getElementById('fine-biz').textContent = CLIENT.businessName;
+
+  // Hero background
+  document.getElementById('hero-section').style.background = CLIENT.brandColor;
+})();
+
+// Darken a hex color by a percentage
+function shadeColor(color, percent) {
+  const num = parseInt(color.replace('#',''), 16);
+  const amt = Math.round(2.55 * percent);
+  const R = Math.min(255, Math.max(0, (num >> 16) + amt));
+  const G = Math.min(255, Math.max(0, (num >> 8 & 0x00FF) + amt));
+  const B = Math.min(255, Math.max(0, (num & 0x0000FF) + amt));
+  return '#' + (0x1000000 + R*0x10000 + G*0x100 + B).toString(16).slice(1);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   FORM SUBMISSION
+───────────────────────────────────────────────────────────── */
+async function submitForm() {
+  const btn    = document.getElementById('submit-btn');
+  const spinner= document.getElementById('cta-spinner');
+  const btnTxt = document.getElementById('btn-text');
+  const errEl  = document.getElementById('error-msg');
+
+  // Collect values
+  const first   = document.getElementById('f-first').value.trim();
+  const last    = document.getElementById('f-last').value.trim();
+  const phone   = document.getElementById('f-phone').value.trim();
+  const city    = document.getElementById('f-city').value.trim();
+  const service = document.getElementById('f-service').value;
+  const notes   = document.getElementById('f-notes').value.trim();
+
+  // Basic validation
+  errEl.style.display = 'none';
+  if (!first)  return showError('Please enter your first name.');
+  if (!phone || phone.replace(/\D/g,'').length < 10)
+               return showError('Please enter a valid 10-digit phone number.');
+  if (!city)   return showError('Please enter your city or neighborhood.');
+
+  // Loading state
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  btnTxt.textContent = 'Sending your request...';
+
+  try {
+    const res = await fetch(CLIENT.backendUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name:    `${first} ${last}`.trim(),
+        phone,
+        service,
+        city,
+        notes,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      // Show success
+      document.getElementById('form-card').style.display = 'none';
+      document.getElementById('success-card').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Fire Meta pixel lead event if Meta ads are running
+      if (typeof fbq !== 'undefined') {
+        fbq('track', 'Lead', { content_name: service });
+      }
+    } else {
+      showError('Something went wrong. Please call us directly at ' + CLIENT.phone);
+      resetBtn();
+    }
+
+  } catch (err) {
+    // If backend URL isn't set yet — show a helpful message during testing
+    if (CLIENT.backendUrl.includes('YOUR-RAILWAY-URL')) {
+      showError('⚠ Demo mode: Backend URL not set yet. Update CLIENT.backendUrl in the config section once your Railway server is live.');
+    } else {
+      showError('Connection error. Please try again or call us at ' + CLIENT.phone);
+    }
+    resetBtn();
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function resetBtn() {
+  const btn    = document.getElementById('submit-btn');
+  const spinner= document.getElementById('cta-spinner');
+  const btnTxt = document.getElementById('btn-text');
+  btn.disabled = false;
+  spinner.style.display = 'none';
+  btnTxt.textContent = 'Get my free estimate →';
+}
+
+// Phone number auto-formatting
+document.getElementById('f-phone').addEventListener('input', function(e) {
+  let v = e.target.value.replace(/\D/g,'');
+  if (v.length >= 6)      v = `(${v.slice(0,3)}) ${v.slice(3,6)}-${v.slice(6,10)}`;
+  else if (v.length >= 3) v = `(${v.slice(0,3)}) ${v.slice(3)}`;
+  e.target.value = v;
+});
+</script>
+
+</body>
+</html>
