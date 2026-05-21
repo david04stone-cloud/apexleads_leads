@@ -25,7 +25,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // needed for Twilio webhooks
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*'
+  origin: '*'
 }));
 
 // ─────────────────────────────────────────────────────────────
