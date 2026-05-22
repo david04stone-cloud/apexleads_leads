@@ -167,7 +167,7 @@ async function sendSMS(to, from, body) {
 async function generateAIResponse(systemPrompt, messages) {
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 300,
       system: systemPrompt,
       messages,
