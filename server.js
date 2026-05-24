@@ -8,6 +8,7 @@ import cors from 'cors';
 import Anthropic from '@anthropic-ai/sdk';
 import twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -20,7 +21,8 @@ app.use(cors({ origin: '*' }));
 // ── Supabase ──────────────────────────────────────────────
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_KEY,
+  { global: { fetch: globalThis.fetch }, realtime: { transport: ws } }
 );
 
 // ── Clients ───────────────────────────────────────────────
