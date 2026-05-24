@@ -16,8 +16,14 @@
 import express from 'express';
 import cors from 'cors';
 import Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.https://faxbtmdjootjenqbknfa.supabase.co,
+  process.env.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZheGJ0bWRqb290amVucWJrbmZhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTUzNjM0MCwiZXhwIjoyMDk1MTEyMzQwfQ.tO2mRZMm8VemdT-_dfFdFjjEXxVBQa_fZJomGXWIcLI
+);
 import twilio from 'twilio';
-import dotenv from 'dotenv';
+import dotenv from 'dotenv';  
 
 dotenv.config();
 
@@ -230,7 +236,8 @@ app.post('/lead/:clientId', async (req, res) => {
     messages: []
   };
 
-  console.log(`New lead: ${name} → ${client.name} | Score: ${score} | ${priority}${isUrgent ? ' ⚡ URGENT' : ''}`);
+  console.log(`New lead: ${name} → ${client.name} | Score: ${score} | ${priority}${isUrgent ? ' ⚡ URGENT' : ''}`;
+supabase.from('leads').insert({ id: lead.id, client_id: client.id, name: lead.name, phone: formattedPhone, service, city: city || client.area, notes: notes || '', score, priority, is_urgent: isUrgent, status: 'new' }).then(({ error }) => { if (error) console.error('Supabase error:', error.message); else console.log('Lead saved:', lead.id); });
 
   // Build the first AI message
   const systemPrompt = buildSystemPrompt(client, lead, isUrgent);
