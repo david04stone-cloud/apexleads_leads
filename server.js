@@ -19,7 +19,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-  process.env.https://faxbtmdjootjenqbknfa.supabase.co,
+  process.env.SUPABASE_URL,
   process.env.eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZheGJ0bWRqb290amVucWJrbmZhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTUzNjM0MCwiZXhwIjoyMDk1MTEyMzQwfQ.tO2mRZMm8VemdT-_dfFdFjjEXxVBQa_fZJomGXWIcLI
 );
 import twilio from 'twilio';
