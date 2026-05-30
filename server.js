@@ -31,6 +31,75 @@ const ALERT_NUMBERS = [
   '+17042540425', // Eli
 ];
 
+// ── Slack Webhooks ────────────────────────────────────────
+const SLACK_WEBHOOK = process.env.SLACK_WEBHOOK;
+
+async function sendSlack(blocks) {
+  try {
+    await fetch(SLACK_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ blocks }),
+    });
+  } catch (err) {
+    console.error('Slack error:', err.message);
+  }
+}
+
+async function slackNewLead(name, service, client, score, priority, isUrgent, leadId) {
+  const emoji = isUrgent ? '🚨' : priority === 'Hot' ? '🔥' : priority === 'Warm' ? '⚡' : '📋';
+  const color = isUrgent ? '#ef4444' : priority === 'Hot' ? '#f59e0b' : '#10b981';
+  await sendSlack([
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `${emoji} *New Lead — ${client.name}*
+*Name:* ${name}
+*Service:* ${service}
+*Score:* ${score}/99 (${priority})
+*AI Status:* Texting them now ⚡`
+      }
+    },
+    {
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: `Lead ID: ${leadId} · <https://leadforgedashboard.vercel.app|View Dashboard>` }]
+    },
+    { type: 'divider' }
+  ]);
+}
+
+async function slackLeadBooked(name, service, clientName, leadId) {
+  await sendSlack([
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `✅ *BOOKED — ${clientName}*
+*Name:* ${name}
+*Service:* ${service}
+*Status:* Appointment confirmed 🎉`
+      }
+    },
+    {
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: `Lead ID: ${leadId} · <https://leadforgedashboard.vercel.app|View Dashboard>` }]
+    },
+    { type: 'divider' }
+  ]);
+}
+
+async function slackOpsAlert(message) {
+  await sendSlack([
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `⚠️ *OPS ALERT*
+${message}` }
+    },
+    { type: 'divider' }
+  ]);
+}
+
 // ── Clients ───────────────────────────────────────────────
 const CLIENTS = {
   'apex-hvac': {
@@ -194,8 +263,10 @@ app.post('/lead/:clientId', async (req, res) => {
     is_urgent: isUrgent,
     status: 'new',
   });
-  if (dbError) console.error('Supabase insert error:', dbError.message);
-  else console.log('Lead saved to Supabase:', leadId);
+  if (dbError) {
+    console.error('Supabase insert error:', dbError.message);
+    slackOpsAlert(`Supabase insert failed for lead ${leadId}: ${dbError.message}`).catch(() => {});
+  } else console.log('Lead saved to Supabase:', leadId);
 
   const systemPrompt = buildSystemPrompt(client, isUrgent);
   const userPrompt = `Write the first text message to this new lead.
@@ -230,6 +301,11 @@ Introduce the business briefly, acknowledge their request, and offer two specifi
   // 🔔 Fire lead alerts to David + Eli
   sendLeadAlert(name, service, client, score, priority, isUrgent).catch(err =>
     console.error('Lead alert error:', err.message)
+  );
+
+  // 📣 Fire Slack notification to #leads
+  slackNewLead(name, service, client, score, priority, isUrgent, leadId).catch(err =>
+    console.error('Slack alert error:', err.message)
   );
 
   res.json({ success: true, leadId, score, priority, isUrgent, smsSent: smsResult.success });
@@ -269,6 +345,8 @@ app.post('/sms/reply', async (req, res) => {
     convo.status = 'booked';
     await supabase.from('leads').update({ status: 'booked' }).eq('id', convo.leadId);
     console.log(`Lead BOOKED: ${convo.leadId}`);
+    // 📣 Fire Slack booked notification
+    slackLeadBooked(convo.messages[0]?.content?.split('Name: ')[1]?.split('\n')[0] || 'Unknown', convo.messages[0]?.content?.split('Service needed: ')[1]?.split('\n')[0] || 'Unknown', client.name, convo.leadId).catch(err => console.error('Slack booked error:', err.message));
   }
 
   await sendSMS(From, client.twilioNumber, aiReply);
@@ -287,6 +365,46 @@ app.get('/dashboard/clients', async (req, res) => {
   const { data, error } = await supabase.from('clients').select('*');
   if (error) return res.status(500).json({ error: error.message });
   res.json({ clients: data });
+});
+
+app.post('/slack/weekly-report', async (req, res) => {
+  if (req.query.secret !== process.env.DASHBOARD_SECRET) return res.status(401).json({ error: 'Unauthorized' });
+  
+  const { data: leads } = await supabase.from('leads').select('*');
+  const { data: clients } = await supabase.from('clients').select('*');
+  
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const weekLeads = leads?.filter(l => l.created_at > weekAgo) || [];
+  const weekBooked = weekLeads.filter(l => l.status === 'booked' || l.status === 'closed');
+  const totalMRR = clients?.reduce((s, c) => s + (c.mrr || 0), 0) || 0;
+  const bookingRate = weekLeads.length ? Math.round(weekBooked.length / weekLeads.length * 100) : 0;
+
+  await sendSlack([
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: '📊 LeadForge — Weekly Report' }
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Total MRR*
+$${totalMRR.toLocaleString()}/mo` },
+        { type: 'mrkdwn', text: `*Active Clients*
+${clients?.length || 0}` },
+        { type: 'mrkdwn', text: `*Leads This Week*
+${weekLeads.length}` },
+        { type: 'mrkdwn', text: `*Booked This Week*
+${weekBooked.length} (${bookingRate}%)` },
+      ]
+    },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `<https://leadforgedashboard.vercel.app|→ View Full Dashboard>` }
+    },
+    { type: 'divider' }
+  ]);
+
+  res.json({ success: true, message: 'Weekly report posted to Slack' });
 });
 
 app.get('/dashboard/stats', async (req, res) => {
