@@ -1,6 +1,6 @@
 /**
- * ApexLeads — Backend Server v2
- * Clean rewrite with Supabase integrated
+ * LeadForge — Backend Server v2
+ * Clean rewrite with Supabase integrated + lead alerts
  */
 
 import express from 'express';
@@ -24,6 +24,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY,
   { global: { fetch: globalThis.fetch }, realtime: { transport: ws } }
 );
+
+// ── Alert Numbers ─────────────────────────────────────────
+const ALERT_NUMBERS = [
+  '+18032899119', // David
+  '+17042540425', // Eli
+];
 
 // ── Clients ───────────────────────────────────────────────
 const CLIENTS = {
@@ -122,10 +128,41 @@ async function generateAIResponse(systemPrompt, messages) {
   return response.content[0].text;
 }
 
+// ── Lead Alert Function ───────────────────────────────────
+async function sendLeadAlert(name, service, client, score, priority, isUrgent) {
+  const flag = isUrgent ? '🚨 URGENT' : priority === 'Hot' ? '🔥 HOT' : priority === 'Warm' ? '⚡ WARM' : '📋 NEW';
+  const msg = `${flag} LEAD — LeadForge
+👤 ${name}
+🔧 ${service}
+🏢 ${client.name}
+📊 Score: ${score}/99
+⚡ AI texting them now
+——
+Dashboard: leadforgedashboard.vercel.app`;
+
+  const results = await Promise.all(
+    ALERT_NUMBERS.map(number =>
+      twilioClient.messages.create({
+        to: number,
+        from: process.env.TWILIO_DEFAULT_NUMBER,
+        body: msg,
+      }).catch(err => {
+        console.error(`Alert failed to ${number}:`, err.message);
+        return null;
+      })
+    )
+  );
+  console.log(`Lead alerts sent to ${ALERT_NUMBERS.length} numbers`);
+}
+
 // ── Routes ────────────────────────────────────────────────
 
 app.get('/', (req, res) => {
-  res.json({ status: 'ApexLeads backend running', clients: Object.keys(CLIENTS).length, timestamp: new Date().toISOString() });
+  res.json({
+    status: 'LeadForge backend running',
+    clients: Object.keys(CLIENTS).length,
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.post('/lead/:clientId', async (req, res) => {
@@ -189,6 +226,11 @@ Introduce the business briefly, acknowledge their request, and offer two specifi
 
   // Update Supabase with AI message
   await supabase.from('leads').update({ ai_message: aiMessage, status: 'contacted' }).eq('id', leadId);
+
+  // 🔔 Fire lead alerts to David + Eli
+  sendLeadAlert(name, service, client, score, priority, isUrgent).catch(err =>
+    console.error('Lead alert error:', err.message)
+  );
 
   res.json({ success: true, leadId, score, priority, isUrgent, smsSent: smsResult.success });
 });
@@ -267,7 +309,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`
   ╔════════════════════════════════════╗
-  ║  ApexLeads backend running         ║
+  ║  LeadForge backend running         ║
   ║  Port: ${PORT}                        ║
   ║  Clients loaded: ${Object.keys(CLIENTS).length}                 ║
   ╚════════════════════════════════════╝
