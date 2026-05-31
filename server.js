@@ -32,18 +32,29 @@ const ALERT_NUMBERS = [
 ];
 
 // ── Slack Webhooks ────────────────────────────────────────
-const SLACK_WEBHOOK = process.env.SLACK_WEBHOOK;
+const SLACK_WEBHOOKS = {
+  leads: process.env.SLACK_WEBHOOK,
+  pipeline: process.env.SLACK_WEBHOOK_PIPELINE,
+  ops: process.env.SLACK_WEBHOOK_OPS,
+  weekly: process.env.SLACK_WEBHOOK_WEEKLY,
+};
 
-async function sendSlack(blocks) {
+async function sendSlackTo(channel, blocks) {
+  const url = SLACK_WEBHOOKS[channel];
+  if (!url) return;
   try {
-    await fetch(SLACK_WEBHOOK, {
+    await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ blocks }),
     });
   } catch (err) {
-    console.error('Slack error:', err.message);
+    console.error('Slack error ['+channel+']:', err.message);
   }
+}
+
+async function sendSlack(blocks) {
+  await sendSlackTo('leads', blocks);
 }
 
 async function slackNewLead(name, service, client, score, priority, isUrgent, leadId) {
@@ -70,7 +81,7 @@ async function slackNewLead(name, service, client, score, priority, isUrgent, le
 }
 
 async function slackLeadBooked(name, service, clientName, leadId) {
-  await sendSlack([
+  const blocks = [
     {
       type: 'section',
       text: {
@@ -83,18 +94,40 @@ async function slackLeadBooked(name, service, clientName, leadId) {
     },
     {
       type: 'context',
-      elements: [{ type: 'mrkdwn', text: `Lead ID: ${leadId} · <https://leadforgedashboard.vercel.app|View Dashboard>` }]
+      elements: [{ type: 'mrkdwn', text: `Lead ID: ${leadId} · <https://apexleadsdashboard.vercel.app|View Dashboard>` }]
+    },
+    { type: 'divider' }
+  ];
+  await sendSlackTo('leads', blocks);
+  await sendSlackTo('pipeline', blocks);
+}
+
+async function slackOpsAlert(message) {
+  await sendSlackTo('ops', [
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `⚠️ *OPS ALERT*
+${message}` }
     },
     { type: 'divider' }
   ]);
 }
 
-async function slackOpsAlert(message) {
-  await sendSlack([
+async function slackPipelineUpdate(name, service, clientName, oldStatus, newStatus) {
+  const emoji = newStatus === 'booked' ? '✅' : newStatus === 'closed' ? '🏆' : newStatus === 'contacted' ? '💬' : newStatus === 'lost' ? '❌' : '🔄';
+  await sendSlackTo('pipeline', [
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `⚠️ *OPS ALERT*
-${message}` }
+      text: {
+        type: 'mrkdwn',
+        text: `${emoji} *Pipeline Update — ${clientName}*
+*Lead:* ${name} — ${service}
+*Status:* ${oldStatus} → *${newStatus}*`
+      }
+    },
+    {
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: `<https://apexleadsdashboard.vercel.app|View Dashboard>` }]
     },
     { type: 'divider' }
   ]);
@@ -379,7 +412,7 @@ app.post('/slack/weekly-report', async (req, res) => {
   const totalMRR = clients?.reduce((s, c) => s + (c.mrr || 0), 0) || 0;
   const bookingRate = weekLeads.length ? Math.round(weekBooked.length / weekLeads.length * 100) : 0;
 
-  await sendSlack([
+  await sendSlackTo('weekly', [
     {
       type: 'header',
       text: { type: 'plain_text', text: '📊 LeadForge — Weekly Report' }
