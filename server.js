@@ -455,6 +455,29 @@ app.get('/dashboard/stats', async (req, res) => {
   });
 });
 
+// ── Update Lead Status ───────────────────────────────────
+app.patch('/dashboard/leads/:id/status', async (req, res) => {
+  if (req.query.secret !== process.env.DASHBOARD_SECRET) return res.status(401).json({ error: 'Unauthorized' });
+  const { id } = req.params;
+  const { status, oldStatus, name, service, clientName } = req.body;
+  if (!status) return res.status(400).json({ error: 'Status required' });
+
+  const { error } = await supabase.from('leads').update({ status }).eq('id', id);
+  if (error) return res.status(500).json({ error: error.message });
+
+  // Fire pipeline Slack notification
+  slackPipelineUpdate(name||'Unknown', service||'General', clientName||'Unknown', oldStatus||'unknown', status)
+    .catch(err => console.error('Slack pipeline error:', err.message));
+
+  // If booked, fire booked notification too
+  if (status === 'booked' || status === 'closed') {
+    slackLeadBooked(name||'Unknown', service||'General', clientName||'Unknown', id)
+      .catch(err => console.error('Slack booked error:', err.message));
+  }
+
+  res.json({ success: true, id, status });
+});
+
 // ── Start ─────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
