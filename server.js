@@ -25,11 +25,7 @@ const supabase = createClient(
   { global: { fetch: globalThis.fetch }, realtime: { transport: ws } }
 );
 
-// ── Alert Numbers ─────────────────────────────────────────
-const ALERT_NUMBERS = [
-  '+18032899119', // David
-  '+17042540425', // Eli
-];
+// ── Alert Numbers — removed, using Slack only ─────────────
 
 // ── Slack Webhooks ────────────────────────────────────────
 const SLACK_WEBHOOKS = {
@@ -211,7 +207,10 @@ function scoreLead(service, notes) {
 
 async function sendSMS(to, from, body) {
   try {
-    const message = await twilioClient.messages.create({ to, from, body });
+    const msgParams = process.env.TWILIO_MESSAGING_SERVICE_SID
+      ? { to, messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID, body }
+      : { to, from, body };
+    const message = await twilioClient.messages.create(msgParams);
     console.log(`SMS sent to ${to} — SID: ${message.sid}`);
     return { success: true, sid: message.sid };
   } catch (err) {
@@ -230,32 +229,7 @@ async function generateAIResponse(systemPrompt, messages) {
   return response.content[0].text;
 }
 
-// ── Lead Alert Function ───────────────────────────────────
-async function sendLeadAlert(name, service, client, score, priority, isUrgent) {
-  const flag = isUrgent ? '🚨 URGENT' : priority === 'Hot' ? '🔥 HOT' : priority === 'Warm' ? '⚡ WARM' : '📋 NEW';
-  const msg = `${flag} LEAD — LeadForge
-👤 ${name}
-🔧 ${service}
-🏢 ${client.name}
-📊 Score: ${score}/99
-⚡ AI texting them now
-——
-Dashboard: leadforgedashboard.vercel.app`;
 
-  const results = await Promise.all(
-    ALERT_NUMBERS.map(number =>
-      twilioClient.messages.create({
-        to: number,
-        from: process.env.TWILIO_DEFAULT_NUMBER,
-        body: msg,
-      }).catch(err => {
-        console.error(`Alert failed to ${number}:`, err.message);
-        return null;
-      })
-    )
-  );
-  console.log(`Lead alerts sent to ${ALERT_NUMBERS.length} numbers`);
-}
 
 // ── Routes ────────────────────────────────────────────────
 
@@ -330,11 +304,6 @@ Introduce the business briefly, acknowledge their request, and offer two specifi
 
   // Update Supabase with AI message
   await supabase.from('leads').update({ ai_message: aiMessage, status: 'contacted' }).eq('id', leadId);
-
-  // 🔔 Fire lead alerts to David + Eli
-  sendLeadAlert(name, service, client, score, priority, isUrgent).catch(err =>
-    console.error('Lead alert error:', err.message)
-  );
 
   // 📣 Fire Slack notification to #leads
   slackNewLead(name, service, client, score, priority, isUrgent, leadId).catch(err =>
