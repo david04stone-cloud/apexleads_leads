@@ -167,30 +167,36 @@ const TONE_PROMPTS = {
   premium: 'Elevated and confident. Positions the business as the premium choice.',
 };
 
-// ── Conversation memory ───────────────────────────────────
-const conversations = new Map();
-
 // ── API clients ───────────────────────────────────────────
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 // ── Helpers ───────────────────────────────────────────────
 function buildSystemPrompt(client, isUrgent) {
-  const toneDesc = TONE_PROMPTS[client.tone] || TONE_PROMPTS.friendly;
-  return `You are an AI follow-up assistant for ${client.name}, a local ${client.niche} company serving ${client.area}.
-Your job is to convert incoming leads into booked appointments via text message.
-Tone: ${toneDesc}
-Business details:
+  return `You are a scheduling assistant for ${client.name}, a local ${client.niche} company serving ${client.area}.
+Your job is to book appointments via SMS on behalf of the business.
+
+CRITICAL RULES — follow every one of these without exception:
+- Never use markdown. No asterisks, no bold, no bullet points. Plain text only.
+- Keep every message under 3 sentences. This is SMS.
+- Never say you are an AI, a bot, or an automated system.
+- Sound like a real person working at the business — professional and friendly.
+- Never use filler phrases like "Great news!" or "Absolutely!" — be natural.
+- Always use the lead's first name once per conversation, not every message.
+- When offering days, say the actual day name — never say "tomorrow" or "next week".
+
+CONVERSATION FLOW:
+1. First message: Acknowledge their request, briefly mention one relevant service strength, offer two specific day options (e.g. "Monday or Wednesday").
+2. When they pick a day: Offer two time slots for that day (e.g. "10am or 2pm").
+3. When they pick a time: Confirm the appointment, give them the booking link to lock it in: ${client.cal}
+4. If they ask a question: Answer it briefly and naturally, then redirect to scheduling.
+5. If they say they are not interested or reply STOP: Acknowledge politely and end the conversation.
+
+Business info:
 - Services: ${client.services.join(', ')}
-- Booking link: ${client.cal}
-- Special instructions: ${client.aiNotes || 'None'}
-Rules:
-- Keep messages SHORT — this is SMS, not email. 2-4 sentences max.
-- Never mention you are an AI.
-- Always end your FIRST message by offering two specific day options.
-- Once they confirm a day, suggest a time slot and give the booking link.
-- After they confirm time, close with a warm confirmation.
-${isUrgent ? 'IMPORTANT: This is an urgent lead. Prioritize same-day or next-day availability.' : ''}`;
+- Area: ${client.area}
+- Notes: ${client.aiNotes || 'None'}
+${isUrgent ? '- URGENT: This person needs help fast. Prioritize same-day or next-day slots.' : ''}`;
 }
 
 function scoreLead(service, notes) {
@@ -291,19 +297,20 @@ Introduce the business briefly, acknowledge their request, and offer two specifi
     return res.status(500).json({ error: 'AI generation failed', detail: err.message });
   }
 
-  conversations.set(formattedPhone, {
-    clientId: client.id,
-    leadId,
-    systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }, { role: 'assistant', content: aiMessage }],
-    status: 'contacted',
-    lastActivity: new Date().toISOString(),
-  });
-
+  // Strip any markdown from AI message
+  aiMessage = aiMessage.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\_\_/g, '').replace(/\_/g, '');
   const smsResult = await sendSMS(formattedPhone, client.twilioNumber, aiMessage);
 
-  // Update Supabase with AI message
-  await supabase.from('leads').update({ ai_message: aiMessage, status: 'contacted' }).eq('id', leadId);
+  // Save conversation + AI message to Supabase
+  await supabase.from('leads').update({
+    ai_message: aiMessage,
+    status: 'contacted',
+    conversation: JSON.stringify([
+      { role: 'user', content: userPrompt },
+      { role: 'assistant', content: aiMessage }
+    ]),
+    system_prompt: systemPrompt,
+  }).eq('id', leadId);
 
   // 📣 Fire Slack notification to #leads
   slackNewLead(name, service, client, score, priority, isUrgent, leadId).catch(err =>
@@ -315,40 +322,72 @@ Introduce the business briefly, acknowledge their request, and offer two specifi
 
 app.post('/sms/reply', async (req, res) => {
   const { From, Body } = req.body;
-  if (!From || !Body) return res.status(400).send('Missing fields');
+  if (!From || !Body) return res.status(200).send('OK');
 
-  const convo = conversations.get(From);
-  if (!convo) return res.status(200).send('OK');
+  // Load lead from Supabase by phone number
+  const { data: leads, error: fetchErr } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('phone', From)
+    .order('created_at', { ascending: false })
+    .limit(1);
 
-  const client = CLIENTS[convo.clientId];
-  if (!client) return res.status(500).send('Client config missing');
-
-  const notInterested = ['stop', 'unsubscribe', 'no thanks', 'not interested', 'remove me'];
-  if (notInterested.some(p => Body.toLowerCase().includes(p))) {
-    conversations.delete(From);
-    await sendSMS(From, client.twilioNumber, "No problem at all! We've removed you from our list. Have a great day!");
+  if (fetchErr || !leads || leads.length === 0) {
+    console.log(`No lead found for ${From}`);
     return res.status(200).send('OK');
   }
 
-  convo.messages.push({ role: 'user', content: Body });
-  convo.lastActivity = new Date().toISOString();
+  const lead = leads[0];
+  const client = CLIENTS[lead.client_id];
+  if (!client) {
+    console.log(`No client config for ${lead.client_id}`);
+    return res.status(200).send('OK');
+  }
+
+  // Handle opt-out
+  const optOut = ['stop', 'unsubscribe', 'no thanks', 'not interested', 'remove me', 'cancel'];
+  if (optOut.some(p => Body.toLowerCase().trim().includes(p))) {
+    await supabase.from('leads').update({ status: 'lost' }).eq('id', lead.id);
+    await sendSMS(From, client.twilioNumber, "You have been unsubscribed and will receive no further messages. Have a great day.");
+    return res.status(200).send('OK');
+  }
+
+  // Load conversation history from Supabase
+  let messages = [];
+  try { messages = lead.conversation ? JSON.parse(lead.conversation) : []; } catch { messages = []; }
+
+  // Use stored system prompt or rebuild it
+  const systemPrompt = lead.system_prompt || buildSystemPrompt(client, lead.is_urgent || false);
+
+  // Add the new reply and generate response
+  messages.push({ role: 'user', content: Body });
 
   let aiReply;
   try {
-    aiReply = await generateAIResponse(convo.systemPrompt, convo.messages);
+    aiReply = await generateAIResponse(systemPrompt, messages);
+    aiReply = aiReply.replace(/\*\*/g, '').replace(/\*/g, '').replace(/__/g, '').replace(/_/g, '');
   } catch (err) {
-    aiReply = `Thanks for your message! You can book directly at ${client.cal}`;
+    console.error('AI reply error:', err.message);
+    aiReply = `Thanks for your message. You can book directly at ${client.cal}`;
   }
 
-  convo.messages.push({ role: 'assistant', content: aiReply });
+  messages.push({ role: 'assistant', content: aiReply });
 
-  const bookingConfirmed = ['booked', 'confirmed', 'see you', 'perfect', 'great', 'sounds good', 'that works'];
-  if (bookingConfirmed.some(p => Body.toLowerCase().includes(p)) && convo.messages.length > 4) {
-    convo.status = 'booked';
-    await supabase.from('leads').update({ status: 'booked' }).eq('id', convo.leadId);
-    console.log(`Lead BOOKED: ${convo.leadId}`);
-    // 📣 Fire Slack booked notification
-    slackLeadBooked(convo.messages[0]?.content?.split('Name: ')[1]?.split('\n')[0] || 'Unknown', convo.messages[0]?.content?.split('Service needed: ')[1]?.split('\n')[0] || 'Unknown', client.name, convo.leadId).catch(err => console.error('Slack booked error:', err.message));
+  // Detect booking
+  const bookingKeywords = ['booked', 'confirmed', 'see you', 'perfect', 'sounds good', 'that works', 'yes', 'yep', 'sure', 'ok', 'okay'];
+  const isBooked = bookingKeywords.some(p => Body.toLowerCase().includes(p)) && messages.length > 4;
+  const newStatus = isBooked ? 'booked' : 'contacted';
+
+  // Save updated conversation to Supabase
+  await supabase.from('leads').update({
+    conversation: JSON.stringify(messages),
+    status: newStatus,
+  }).eq('id', lead.id);
+
+  if (isBooked) {
+    console.log(`Lead BOOKED: ${lead.id}`);
+    slackLeadBooked(lead.name, lead.service, client.name, lead.id).catch(() => {});
+    slackPipelineUpdate(lead.name, lead.service, client.name, 'contacted', 'booked').catch(() => {});
   }
 
   await sendSMS(From, client.twilioNumber, aiReply);
