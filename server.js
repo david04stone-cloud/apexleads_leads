@@ -76,16 +76,18 @@ async function slackNewLead(name, service, client, score, priority, isUrgent, le
   ]);
 }
 
-async function slackLeadBooked(name, service, clientName, leadId) {
+async function slackLeadBooked(name, service, clientName, leadId, phone, day, time) {
   const blocks = [
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `✅ *BOOKED — ${clientName}*
-*Name:* ${name}
+        text: `🗓 *READY TO BOOK — ${clientName}*
+*Lead:* ${name}
 *Service:* ${service}
-*Status:* Appointment confirmed 🎉`
+*Confirmed:* ${day||'Day confirmed'} ${time ? 'at '+time : ''}
+*Phone:* ${phone||'See dashboard'}
+*Action needed:* Call the lead to confirm the appointment details.`
       }
     },
     {
@@ -130,17 +132,19 @@ async function slackPipelineUpdate(name, service, clientName, oldStatus, newStat
 }
 
 // ── Clients ───────────────────────────────────────────────
+// cal: Calendly/booking URL if client has one, or null for manual confirmation flow
+// contactPhone: contractor's real number shown to lead when confirming
 const CLIENTS = {
   'apex-hvac': {
     id: 'apex-hvac',
     name: 'Apex HVAC Charlotte',
     niche: 'HVAC',
     area: 'Charlotte & Pineville NC',
-    phone: '(704) 555-0190',
-    cal: 'https://calendly.com/apexhvac/estimate',
+    contactPhone: '(704) 555-0190',
+    cal: null,
     twilioNumber: process.env.TWILIO_DEFAULT_NUMBER,
-    tone: 'friendly',
-    aiNotes: 'Always mention same-day availability when possible. Family-owned business.',
+    tone: 'professional',
+    aiNotes: 'Same-day availability when possible. Family-owned business. Free estimates.',
     services: ['AC repair', 'AC installation', 'Heating', 'Emergency service', 'Tune-up'],
   },
   'green-edge': {
@@ -148,11 +152,11 @@ const CLIENTS = {
     name: 'Green Edge Landscaping',
     niche: 'Landscaping',
     area: 'Lancaster SC',
-    phone: '(803) 555-0142',
-    cal: 'https://calendly.com/greenedge/estimate',
+    contactPhone: '(803) 555-0142',
+    cal: null,
     twilioNumber: process.env.TWILIO_DEFAULT_NUMBER,
-    tone: 'southern',
-    aiNotes: 'Mention free estimates. Serve Lancaster County and surrounding areas.',
+    tone: 'professional',
+    aiNotes: 'Free estimates. Serve Lancaster County and surrounding areas.',
     services: ['Lawn mowing', 'Landscaping design', 'Mulch & edging', 'Sod installation'],
   },
 };
@@ -173,30 +177,36 @@ const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_A
 
 // ── Helpers ───────────────────────────────────────────────
 function buildSystemPrompt(client, isUrgent) {
+  const hasCalendly = client.cal && client.cal.length > 0;
+  const bookingInstruction = hasCalendly
+    ? `When they confirm a time: Send them the booking link to lock it in: ${client.cal} — then confirm the appointment warmly.`
+    : `When they confirm a time: Send a warm confirmation and let them know someone will call them at that time from ${client.contactPhone} to confirm the details. Do NOT mention any booking link.`;
+
   return `You are a scheduling assistant for ${client.name}, a local ${client.niche} company serving ${client.area}.
-Your job is to book appointments via SMS on behalf of the business.
+Your only job is to get an appointment day and time confirmed over text, then wrap up professionally.
 
-CRITICAL RULES — follow every one of these without exception:
-- Never use markdown. No asterisks, no bold, no bullet points. Plain text only.
-- Keep every message under 3 sentences. This is SMS.
-- Never say you are an AI, a bot, or an automated system.
-- Sound like a real person working at the business — professional and friendly.
-- Never use filler phrases like "Great news!" or "Absolutely!" — be natural.
-- Always use the lead's first name once per conversation, not every message.
-- When offering days, say the actual day name — never say "tomorrow" or "next week".
+CRITICAL RULES — no exceptions:
+- Plain text only. No asterisks, no bold, no bullet points, no markdown of any kind.
+- Every message must be under 3 sentences. This is SMS, not email.
+- Never reveal you are an AI, a bot, or an automated system.
+- Sound like a real team member at the business — calm, professional, helpful.
+- No filler phrases: never say "Great!", "Absolutely!", "Of course!", "Certainly!" — be natural.
+- Use the lead's first name once early in the conversation, not repeatedly.
+- Always use actual day names (Monday, Tuesday etc.) — never say "tomorrow" or "next week".
+- Never make up availability — offer two options and let them choose.
 
-CONVERSATION FLOW:
-1. First message: Acknowledge their request, briefly mention one relevant service strength, offer two specific day options (e.g. "Monday or Wednesday").
-2. When they pick a day: Offer two time slots for that day (e.g. "10am or 2pm").
-3. When they pick a time: Confirm the appointment, give them the booking link to lock it in: ${client.cal}
-4. If they ask a question: Answer it briefly and naturally, then redirect to scheduling.
-5. If they say they are not interested or reply STOP: Acknowledge politely and end the conversation.
+CONVERSATION FLOW — follow this exactly:
+Step 1 — First message: Acknowledge their request, mention one relevant strength of the business, offer two specific day options this week.
+Step 2 — They pick a day: Offer two time slot options for that day (e.g. "10am or 2pm").
+Step 3 — They pick a time: ${bookingInstruction}
+Step 4 — If they ask a question: Answer it briefly and naturally, then steer back to scheduling.
+Step 5 — If not interested or says STOP: Acknowledge politely, tell them they will not receive further messages.
 
-Business info:
-- Services: ${client.services.join(', ')}
-- Area: ${client.area}
-- Notes: ${client.aiNotes || 'None'}
-${isUrgent ? '- URGENT: This person needs help fast. Prioritize same-day or next-day slots.' : ''}`;
+Business details:
+- Services offered: ${client.services.join(', ')}
+- Service area: ${client.area}
+- Additional notes: ${client.aiNotes || 'None'}
+${isUrgent ? '- PRIORITY: This person needs urgent help. Lead with same-day or next-day availability.' : ''}`;
 }
 
 function scoreLead(service, notes) {
@@ -386,7 +396,7 @@ app.post('/sms/reply', async (req, res) => {
 
   if (isBooked) {
     console.log(`Lead BOOKED: ${lead.id}`);
-    slackLeadBooked(lead.name, lead.service, client.name, lead.id).catch(() => {});
+    slackLeadBooked(lead.name, lead.service, client.name, lead.id, lead.phone, '', '').catch(() => {});
     slackPipelineUpdate(lead.name, lead.service, client.name, 'contacted', 'booked').catch(() => {});
   }
 
